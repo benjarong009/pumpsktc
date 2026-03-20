@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin — PumpRadar สระแก้ว</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:#08090b; --surface:#111215; --surface2:#1a1c20;
+      --border:#252729; --border2:#2e3035;
+      --text:#e2e4e9; --text-muted:#7a7f8a; --text-dim:#4a4f5a;
+      --accent:#f59e0b; --accent-dim:rgba(245,158,11,0.12);
+      --green:#22c55e; --green-dim:rgba(34,197,94,0.12);
+      --red:#ef4444; --red-dim:rgba(239,68,68,0.12);
+      --yellow:#eab308; --yellow-dim:rgba(234,179,8,0.12);
+      --radius:10px; --font:'IBM Plex Sans Thai',sans-serif; --mono:'IBM Plex Mono',monospace;
+    }
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;}
+
+    header{background:rgba(8,9,11,.95);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;gap:14px;height:56px;}
+    .logo{display:flex;align-items:center;gap:9px;font-weight:700;font-size:16px;}
+    .logo-icon{width:28px;height:28px;background:var(--red);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;}
+    .admin-badge{background:var(--red-dim);border:1px solid rgba(239,68,68,.3);color:#f87171;font-size:10px;font-family:var(--mono);padding:3px 8px;border-radius:20px;letter-spacing:.8px;}
+    .header-right{margin-left:auto;display:flex;align-items:center;gap:10px;}
+    .admin-name{font-size:13px;color:var(--text-muted);}
+    .logout-btn{background:none;border:1px solid var(--border);color:var(--text-muted);font-family:var(--font);font-size:12px;padding:5px 12px;border-radius:7px;cursor:pointer;transition:all .18s;}
+    .logout-btn:hover{border-color:var(--red);color:var(--red);}
+    .back-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);font-family:var(--font);font-size:12px;padding:5px 12px;border-radius:7px;cursor:pointer;text-decoration:none;transition:all .18s;}
+    .back-btn:hover{border-color:var(--border2);color:var(--text);}
+
+    /* LOGIN SCREEN */
+    #login-screen{display:flex;align-items:center;justify-content:center;min-height:calc(100vh - 56px);padding:16px;}
+    .login-box{background:var(--surface);border:1px solid var(--border2);border-radius:14px;padding:32px;width:100%;max-width:360px;}
+    .login-box h2{font-size:20px;font-weight:700;margin-bottom:6px;}
+    .login-box p{font-size:13px;color:var(--text-muted);margin-bottom:24px;}
+    .form-group{margin-bottom:14px;}
+    label{display:block;font-size:12px;color:var(--text-muted);margin-bottom:5px;font-weight:500;}
+    input{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:var(--font);font-size:14px;padding:10px 12px;border-radius:7px;outline:none;transition:border-color .18s;}
+    input:focus{border-color:var(--accent);}
+    .login-submit{width:100%;background:var(--accent);color:#000;border:none;font-family:var(--font);font-size:14px;font-weight:700;padding:12px;border-radius:8px;cursor:pointer;margin-top:4px;transition:all .18s;}
+    .login-submit:hover{background:#fbbf24;}
+    .login-error{background:var(--red-dim);border:1px solid rgba(239,68,68,.3);color:#f87171;padding:8px 12px;border-radius:6px;font-size:13px;margin-bottom:14px;display:none;}
+    .login-error.show{display:block;}
+
+    /* ADMIN PANEL */
+    #admin-panel{display:none;max-width:1000px;margin:0 auto;padding:24px 16px;}
+    .panel-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px;}
+    .panel-title{font-size:20px;font-weight:700;}
+    .stats-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px;}
+    .stat-chip{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 16px;font-size:13px;}
+    .stat-chip span{font-family:var(--mono);font-weight:700;font-size:18px;display:block;margin-bottom:2px;}
+    .stat-chip span.green{color:var(--green);}
+    .stat-chip span.red{color:var(--red);}
+    .stat-chip span.yellow{color:var(--yellow);}
+    .stat-chip small{color:var(--text-muted);font-size:11px;}
+
+    /* FILTER ROW */
+    .filter-row{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;}
+    .filter-chip{background:var(--surface);border:1px solid var(--border);color:var(--text-muted);font-size:12px;padding:5px 12px;border-radius:20px;cursor:pointer;transition:all .18s;}
+    .filter-chip:hover{border-color:var(--border2);color:var(--text);}
+    .filter-chip.active{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
+
+    /* SEARCH */
+    .search-bar{width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:var(--font);font-size:14px;padding:10px 14px;border-radius:9px;outline:none;margin-bottom:14px;transition:border-color .18s;}
+    .search-bar:focus{border-color:var(--accent);}
+
+    /* TABLE */
+    .report-table{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+    .table-head{display:grid;grid-template-columns:2fr 1fr 1fr 1fr 120px 90px;padding:10px 16px;font-size:11px;color:var(--text-dim);font-family:var(--mono);text-transform:uppercase;border-bottom:1px solid var(--border);background:var(--surface2);}
+    .table-row{display:grid;grid-template-columns:2fr 1fr 1fr 1fr 120px 90px;padding:12px 16px;border-bottom:1px solid var(--border);align-items:center;transition:background .15s;}
+    .table-row:last-child{border-bottom:none;}
+    .table-row:hover{background:var(--surface2);}
+    .tr-station{font-weight:500;font-size:13px;}
+    .tr-station small{display:block;font-size:11px;color:var(--text-muted);font-weight:400;margin-top:1px;}
+    .tr-brand{font-size:12px;color:var(--text-muted);}
+    .tr-reporter{font-size:12px;color:var(--text-dim);font-family:var(--mono);}
+    .tr-time{font-size:11px;color:var(--text-dim);font-family:var(--mono);}
+    .status-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;font-size:11.5px;font-weight:600;}
+    .status-badge.available{background:var(--green-dim);color:var(--green);border:1px solid rgba(34,197,94,.25);}
+    .status-badge.unavailable{background:var(--red-dim);color:var(--red);border:1px solid rgba(239,68,68,.25);}
+    .status-badge.queue{background:var(--yellow-dim);color:var(--yellow);border:1px solid rgba(234,179,8,.25);}
+    .del-btn{background:var(--red-dim);border:1px solid rgba(239,68,68,.25);color:var(--red);font-family:var(--font);font-size:12px;padding:5px 12px;border-radius:6px;cursor:pointer;transition:all .18s;}
+    .del-btn:hover{background:var(--red);color:#fff;}
+
+    .empty-table{text-align:center;padding:48px;color:var(--text-dim);font-size:14px;}
+
+    /* CONFIRM MODAL */
+    .confirm-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);z-index:2000;display:flex;align-items:center;justify-content:center;padding:16px;}
+    .confirm-backdrop.hidden{display:none;}
+    .confirm-box{background:var(--surface);border:1px solid var(--border2);border-radius:12px;padding:24px;width:100%;max-width:340px;text-align:center;}
+    .confirm-box h4{font-size:16px;font-weight:700;margin-bottom:8px;}
+    .confirm-box p{font-size:13px;color:var(--text-muted);margin-bottom:20px;line-height:1.5;}
+    .confirm-btns{display:flex;gap:8px;}
+    .confirm-cancel{flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);font-family:var(--font);font-size:14px;padding:10px;border-radius:8px;cursor:pointer;}
+    .confirm-delete{flex:1;background:var(--red);color:#fff;border:none;font-family:var(--font);font-size:14px;font-weight:700;padding:10px;border-radius:8px;cursor:pointer;transition:all .18s;}
+    .confirm-delete:hover{background:#dc2626;}
+
+    .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--surface);border:1px solid var(--border2);color:var(--text);padding:12px 20px;border-radius:var(--radius);font-size:14px;z-index:9999;transition:transform .3s cubic-bezier(.34,1.56,.64,1);box-shadow:0 8px 32px rgba(0,0,0,.5);}
+    .toast.show{transform:translateX(-50%) translateY(0);}
+
+    @media(max-width:700px){
+      .table-head,.table-row{grid-template-columns:2fr 1fr 1fr 80px;}
+      .table-head>*:nth-child(3),.table-row>*:nth-child(3),
+      .table-head>*:nth-child(5),.table-row>*:nth-child(5){display:none;}
+    }
+    ::-webkit-scrollbar{width:6px;} ::-webkit-scrollbar-track{background:transparent;} ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">🛡️</div>
+    <span>PumpRadar</span>
+  </div>
+  <div class="admin-badge">ADMIN</div>
+  <div class="header-right">
+    <span class="admin-name" id="admin-name"></span>
+    <a href="/" class="back-btn">← กลับหน้าหลัก</a>
+    <button class="logout-btn" onclick="doLogout()">ออกจากระบบ</button>
+  </div>
+</header>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <h2>🛡️ Admin Login</h2>
+    <p>เข้าสู่ระบบจัดการรายงาน</p>
+    <div class="login-error" id="login-error"></div>
+    <div class="form-group"><label>ชื่อผู้ใช้</label><input type="text" id="a-user" placeholder="admin" autocomplete="username"></div>
+    <div class="form-group"><label>รหัสผ่าน</label><input type="password" id="a-pass" placeholder="รหัสผ่าน" autocomplete="current-password"></div>
+    <button class="login-submit" onclick="doLogin()">เข้าสู่ระบบ</button>
+  </div>
+</div>
+
+<!-- ADMIN PANEL -->
+<div id="admin-panel">
+  <div class="panel-header">
+    <div class="panel-title">📋 จัดการรายงาน</div>
+  </div>
+
+  <div class="stats-row" id="stats-row"></div>
+
+  <input class="search-bar" id="search-bar" placeholder="🔍 ค้นหาชื่อปั๊ม หรือ หมายเหตุ..." oninput="applyFilters()">
+
+  <div class="filter-row">
+    <div class="filter-chip active" onclick="setFilter('',this)">ทั้งหมด</div>
+    <div class="filter-chip" onclick="setFilter('มีน้ำมัน',this)">✅ มีน้ำมัน</div>
+    <div class="filter-chip" onclick="setFilter('ไม่มีน้ำมัน',this)">❌ ไม่มีน้ำมัน</div>
+    <div class="filter-chip" onclick="setFilter('คิวยาว',this)">🟡 คิวยาว</div>
+  </div>
+
+  <div class="report-table">
+    <div class="table-head">
+      <div>ปั๊ม / จังหวัด</div>
+      <div>แบรนด์</div>
+      <div>สถานะ</div>
+      <div>ผู้รายงาน</div>
+      <div>เวลา</div>
+      <div>จัดการ</div>
+    </div>
+    <div id="table-body"></div>
+  </div>
+</div>
+
+<!-- CONFIRM DELETE -->
+<div class="confirm-backdrop hidden" id="confirm-modal">
+  <div class="confirm-box">
+    <h4>🗑️ ยืนยันการลบ</h4>
+    <p id="confirm-text">ต้องการลบรายงานนี้ใช่ไหม?<br>ไม่สามารถกู้คืนได้</p>
+    <div class="confirm-btns">
+      <button class="confirm-cancel" onclick="hideConfirm()">ยกเลิก</button>
+      <button class="confirm-delete" onclick="confirmDelete()">ลบเลย</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = 'http://localhost:3000/api';
+const ADMIN_TOKEN_KEY = 'pumpradar_admin_token';
+let adminToken = localStorage.getItem(ADMIN_TOKEN_KEY) || null;
+let allReports = [];
+let currentFilter = '';
+let pendingDeleteId = null;
+
+// ── TOAST ─────────────────────────────────────────────────────────────────────
+let toastT;
+function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),2500); }
+
+// ── AUTH ──────────────────────────────────────────────────────────────────────
+async function doLogin() {
+  const username = document.getElementById('a-user').value.trim();
+  const password = document.getElementById('a-pass').value;
+  const errEl = document.getElementById('login-error');
+  errEl.classList.remove('show');
+  try {
+    const res = await fetch(`${API}/admin/login`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username, password}) });
+    const data = await res.json();
+    if (!res.ok) { errEl.textContent = data.error||'ล็อกอินไม่สำเร็จ'; errEl.classList.add('show'); return; }
+    adminToken = data.token;
+    localStorage.setItem(ADMIN_TOKEN_KEY, adminToken);
+    showPanel();
+  } catch(e) { errEl.textContent='เกิดข้อผิดพลาด'; errEl.classList.add('show'); }
+}
+
+function doLogout() {
+  fetch(`${API}/logout`, { method:'POST', headers:{'x-token': adminToken||''} }).catch(()=>{});
+  adminToken = null;
+  localStorage.removeItem(ADMIN_TOKEN_KEY);
+  document.getElementById('admin-panel').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('admin-name').textContent = '';
+}
+
+// Enter key
+document.addEventListener('keydown', e => {
+  if (e.key==='Enter' && document.getElementById('login-screen').style.display!=='none') doLogin();
+});
+
+// ── PANEL ─────────────────────────────────────────────────────────────────────
+function showPanel() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('admin-panel').style.display = 'block';
+  document.getElementById('admin-name').textContent = '👤 Admin';
+  loadData();
+}
+
+async function loadData() {
+  try {
+    const [rep, stats] = await Promise.all([
+      fetch(`${API}/admin/reports`, { headers:{'x-token': adminToken} }).then(r=>r.json()),
+      fetch(`${API}/stats`).then(r=>r.json())
+    ]);
+    allReports = rep.reports || [];
+    renderStats(stats);
+    applyFilters();
+  } catch(e) { showToast('❌ โหลดข้อมูลไม่ได้'); }
+}
+
+function renderStats(s) {
+  document.getElementById('stats-row').innerHTML = `
+    <div class="stat-chip"><span style="color:var(--accent)">${s.total}</span><small>ทั้งหมด</small></div>
+    <div class="stat-chip"><span class="green">${s.avail}</span><small>มีน้ำมัน</small></div>
+    <div class="stat-chip"><span class="red">${s.unavail}</span><small>ไม่มีน้ำมัน</small></div>
+    <div class="stat-chip"><span class="yellow">${s.queue}</span><small>คิวยาว</small></div>`;
+}
+
+let filterStatus = '';
+function setFilter(f, el) {
+  filterStatus = f;
+  document.querySelectorAll('.filter-chip').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  applyFilters();
+}
+
+function applyFilters() {
+  const q = document.getElementById('search-bar').value.trim().toLowerCase();
+  let list = allReports;
+  if (filterStatus) list = list.filter(r => r.status === filterStatus);
+  if (q) list = list.filter(r => r.station.toLowerCase().includes(q) || (r.comment||'').toLowerCase().includes(q) || r.brand.toLowerCase().includes(q));
+  renderTable(list);
+}
+
+const STATUS_ICON = {'มีน้ำมัน':'✅','ไม่มีน้ำมัน':'❌','คิวยาว':'🟡'};
+
+function renderTable(list) {
+  const tbody = document.getElementById('table-body');
+  if (!list.length) { tbody.innerHTML = '<div class="empty-table">ไม่พบรายงาน</div>'; return; }
+  tbody.innerHTML = list.map(r => {
+    const sc = r.status==='มีน้ำมัน'?'available':r.status==='ไม่มีน้ำมัน'?'unavailable':'queue';
+    return `<div class="table-row">
+      <div class="tr-station">${r.station}<small>${r.comment ? '💬 '+r.comment.slice(0,40)+(r.comment.length>40?'...':'') : ''}</small></div>
+      <div class="tr-brand">${r.brand}</div>
+      <div><span class="status-badge ${sc}">${STATUS_ICON[r.status]} ${r.status}</span></div>
+      <div class="tr-reporter">${r.reported_by||'—'}</div>
+      <div class="tr-time">${timeAgo(r.created_at)}</div>
+      <div><button class="del-btn" onclick="askDelete('${r.id}','${r.station.replace(/'/g,"\\'")}')">🗑️ ลบ</button></div>
+    </div>`;
+  }).join('');
+}
+
+function timeAgo(iso) {
+  const diff=(Date.now()-new Date(iso))/1000;
+  if(diff<60)return'เมื่อกี้';
+  if(diff<3600)return`${Math.floor(diff/60)} นาทีที่แล้ว`;
+  if(diff<86400)return`${Math.floor(diff/3600)} ชม.ที่แล้ว`;
+  return`${Math.floor(diff/86400)} วันที่แล้ว`;
+}
+
+// ── DELETE ────────────────────────────────────────────────────────────────────
+function askDelete(id, name) {
+  pendingDeleteId = id;
+  document.getElementById('confirm-text').innerHTML = `ต้องการลบรายงานนี้ใช่ไหม?<br><strong>${name}</strong><br><br><span style="color:var(--red-dim)">ไม่สามารถกู้คืนได้</span>`;
+  document.getElementById('confirm-modal').classList.remove('hidden');
+}
+function hideConfirm() { document.getElementById('confirm-modal').classList.add('hidden'); pendingDeleteId=null; }
+
+async function confirmDelete() {
+  if (!pendingDeleteId) return;
+  try {
+    const res = await fetch(`${API}/reports/${pendingDeleteId}`, { method:'DELETE', headers:{'x-token': adminToken} });
+    if (!res.ok) throw new Error();
+    allReports = allReports.filter(r => r.id !== pendingDeleteId);
+    hideConfirm();
+    applyFilters();
+    showToast('🗑️ ลบรายงานแล้ว');
+  } catch(e) { showToast('❌ ลบไม่สำเร็จ'); hideConfirm(); }
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+if (adminToken) {
+  showPanel();
+} else {
+  document.getElementById('a-user').focus();
+}
+</script>
+</body>
+</html>

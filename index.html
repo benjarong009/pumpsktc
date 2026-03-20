@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PumpRadar สระแก้ว — ปั๊มไหนมีน้ำมัน?</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:#08090b; --surface:#111215; --surface2:#1a1c20;
+      --border:#252729; --border2:#2e3035;
+      --text:#e2e4e9; --text-muted:#7a7f8a; --text-dim:#4a4f5a;
+      --accent:#f59e0b; --accent-dim:rgba(245,158,11,0.12);
+      --green:#22c55e; --green-dim:rgba(34,197,94,0.12);
+      --red:#ef4444;   --red-dim:rgba(239,68,68,0.12);
+      --yellow:#eab308;--yellow-dim:rgba(234,179,8,0.12);
+      --blue:#3b82f6;
+      --radius:10px;
+      --font:'IBM Plex Sans Thai',sans-serif;
+      --mono:'IBM Plex Mono',monospace;
+    }
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;overflow-x:hidden;}
+
+    /* HEADER */
+    header{position:sticky;top:0;z-index:1000;background:rgba(8,9,11,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:0 20px;display:flex;align-items:center;gap:16px;height:56px;}
+    .logo{display:flex;align-items:center;gap:9px;font-weight:700;font-size:17px;white-space:nowrap;}
+    .logo-icon{width:30px;height:30px;background:var(--accent);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:15px;}
+    .live-badge{display:flex;align-items:center;gap:5px;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);color:#f87171;font-size:10px;font-family:var(--mono);padding:3px 8px;border-radius:20px;}
+    .live-dot{width:6px;height:6px;border-radius:50%;background:#ef4444;animation:pulse 1.5s infinite;}
+    @keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.4;transform:scale(.7);}}
+    nav{display:flex;gap:2px;margin-left:auto;}
+    .nav-btn{background:none;border:none;color:var(--text-muted);font-family:var(--font);font-size:13.5px;font-weight:500;padding:6px 14px;border-radius:7px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:6px;}
+    .nav-btn:hover{color:var(--text);background:var(--surface2);}
+    .nav-btn.active{color:var(--accent);background:var(--accent-dim);}
+
+    /* LAYOUT */
+    main{display:none;} main.active{display:block;}
+
+    /* MAP */
+    #map-view{height:calc(100vh - 56px);position:relative;}
+    #map{width:100%;height:100%;}
+    .map-overlay{position:absolute;top:16px;left:16px;z-index:500;}
+    .map-stats{background:rgba(8,9,11,.88);backdrop-filter:blur(10px);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;display:flex;gap:20px;}
+    .map-stat-num{font-size:22px;font-weight:700;font-family:var(--mono);}
+    .map-stat-label{font-size:10px;color:var(--text-muted);margin-top:1px;}
+    .map-stat-num.green{color:var(--green);}.map-stat-num.red{color:var(--red);}.map-stat-num.yellow{color:var(--yellow);}
+    .leaflet-container{background:#0d1117;}
+    .leaflet-popup-content-wrapper{background:var(--surface);color:var(--text);border:1px solid var(--border2);border-radius:var(--radius);box-shadow:0 4px 20px rgba(0,0,0,.5);}
+    .leaflet-popup-tip{background:var(--surface);}
+    .leaflet-popup-content{margin:14px 16px;font-family:var(--font);}
+    .popup-station{font-size:14px;font-weight:600;margin-bottom:6px;}
+    .popup-time{font-size:11px;color:var(--text-muted);font-family:var(--mono);}
+
+    /* FEED */
+    #feed-view{max-width:720px;margin:0 auto;padding:24px 16px;}
+    .feed-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
+    .feed-title{font-size:13px;color:var(--text-muted);font-family:var(--mono);}
+    .feed-count{font-size:13px;color:var(--text-muted);font-family:var(--mono);}
+    .filter-row{display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;}
+    .filter-chip{background:var(--surface);border:1px solid var(--border);color:var(--text-muted);font-size:12px;padding:5px 12px;border-radius:20px;cursor:pointer;transition:all .18s;}
+    .filter-chip:hover{border-color:var(--border2);color:var(--text);}
+    .filter-chip.active-filter{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
+    .report-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:10px;transition:border-color .2s;animation:slideIn .25s ease;}
+    @keyframes slideIn{from{opacity:0;transform:translateY(-8px);}to{opacity:1;transform:translateY(0);}}
+    .report-card:hover{border-color:var(--border2);}
+    .card-top{display:flex;align-items:flex-start;gap:12px;margin-bottom:10px;}
+    .brand-badge{width:38px;height:38px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+    .card-info{flex:1;min-width:0;}
+    .card-station{font-size:15px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .card-sub{font-size:12px;color:var(--text-muted);margin-top:2px;}
+    .status-badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:12.5px;font-weight:600;flex-shrink:0;}
+    .status-badge.available{background:var(--green-dim);color:var(--green);border:1px solid rgba(34,197,94,.25);}
+    .status-badge.unavailable{background:var(--red-dim);color:var(--red);border:1px solid rgba(239,68,68,.25);}
+    .status-badge.queue{background:var(--yellow-dim);color:var(--yellow);border:1px solid rgba(234,179,8,.25);}
+    .fuel-tags{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;}
+    .fuel-tag{background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);font-size:11px;padding:2px 8px;border-radius:4px;font-family:var(--mono);}
+    .card-comment{font-size:13px;color:var(--text-muted);line-height:1.5;margin-bottom:10px;padding:10px 12px;background:var(--surface2);border-radius:6px;border-left:2px solid var(--border2);}
+    .card-footer{display:flex;align-items:center;justify-content:space-between;}
+    .card-time{font-size:11px;color:var(--text-dim);font-family:var(--mono);}
+    .upvote-btn{display:flex;align-items:center;gap:5px;background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);font-family:var(--font);font-size:12px;padding:4px 10px;border-radius:6px;cursor:pointer;transition:all .18s;}
+    .upvote-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
+    .upvote-btn.voted{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
+    .skeleton{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:10px;height:120px;position:relative;overflow:hidden;}
+    .skeleton::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.04),transparent);animation:shimmer 1.5s infinite;}
+    @keyframes shimmer{from{transform:translateX(-100%);}to{transform:translateX(100%);}}
+    .empty-feed{text-align:center;padding:60px 20px;color:var(--text-dim);}
+    .empty-feed .empty-icon{font-size:48px;margin-bottom:12px;}
+
+    /* REPORT FORM */
+    #report-view{max-width:600px;margin:0 auto;padding:32px 16px;}
+    .form-header{margin-bottom:28px;}
+    .form-header h2{font-size:22px;font-weight:700;margin-bottom:6px;}
+    .form-header p{font-size:14px;color:var(--text-muted);line-height:1.5;}
+    .form-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:14px;}
+    .form-section-title{font-size:11px;font-family:var(--mono);color:var(--text-muted);letter-spacing:.8px;text-transform:uppercase;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border);}
+    .form-group{margin-bottom:14px;} .form-group:last-child{margin-bottom:0;}
+    label{display:block;font-size:13px;color:var(--text-muted);margin-bottom:6px;font-weight:500;}
+    input[type="text"],textarea,select{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:var(--font);font-size:14px;padding:10px 12px;border-radius:7px;outline:none;transition:border-color .18s;}
+    input[type="text"]:focus,textarea:focus,select:focus{border-color:var(--accent);}
+    textarea{resize:vertical;min-height:80px;} select option{background:var(--surface2);}
+    .status-select{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+    .status-option{border:2px solid var(--border);border-radius:8px;padding:12px 8px;text-align:center;cursor:pointer;transition:all .18s;font-size:13px;font-weight:500;}
+    .status-option .s-icon{font-size:22px;display:block;margin-bottom:4px;}
+    .sel-available{border-color:var(--green)!important;background:var(--green-dim)!important;color:var(--green)!important;}
+    .sel-unavailable{border-color:var(--red)!important;background:var(--red-dim)!important;color:var(--red)!important;}
+    .sel-queue{border-color:var(--yellow)!important;background:var(--yellow-dim)!important;color:var(--yellow)!important;}
+    .fuel-checkboxes{display:flex;gap:8px;flex-wrap:wrap;}
+    .fuel-check input{display:none;}
+    .fuel-chip{background:var(--surface2);border:1.5px solid var(--border);color:var(--text-muted);font-size:12px;font-family:var(--mono);padding:5px 12px;border-radius:6px;cursor:pointer;transition:all .18s;user-select:none;}
+    .fuel-check input:checked+.fuel-chip{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
+    .coords-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+    .get-location-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);font-family:var(--font);font-size:12px;padding:8px 14px;border-radius:7px;cursor:pointer;transition:all .18s;margin-top:8px;width:100%;display:flex;align-items:center;justify-content:center;gap:6px;}
+    .get-location-btn:hover{border-color:var(--blue);color:var(--blue);}
+    .submit-btn{width:100%;background:var(--accent);color:#000;border:none;font-family:var(--font);font-size:15px;font-weight:700;padding:14px;border-radius:var(--radius);cursor:pointer;transition:all .18s;margin-top:6px;}
+    .submit-btn:hover{background:#fbbf24;transform:translateY(-1px);}
+    .submit-btn:disabled{background:var(--text-dim);cursor:not-allowed;transform:none;}
+
+    /* DASHBOARD */
+    #dash-view{max-width:900px;margin:0 auto;padding:24px 16px;}
+    .dash-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:24px;}
+    .dash-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;}
+    .dash-card-num{font-size:36px;font-weight:700;font-family:var(--mono);margin-bottom:4px;}
+    .dash-card-label{font-size:12px;color:var(--text-muted);}
+    .province-table{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+    .province-table-head{display:grid;grid-template-columns:1fr 80px 80px 80px;padding:10px 16px;font-size:11px;color:var(--text-dim);font-family:var(--mono);text-transform:uppercase;border-bottom:1px solid var(--border);background:var(--surface2);}
+    .province-row{display:grid;grid-template-columns:1fr 80px 80px 80px;padding:11px 16px;font-size:13px;border-bottom:1px solid var(--border);transition:background .15s;}
+    .province-row:last-child{border-bottom:none;} .province-row:hover{background:var(--surface2);}
+    .pv-name{font-weight:500;} .pv-num{font-family:var(--mono);color:var(--text-muted);}
+    .pv-g{color:var(--green);font-family:var(--mono);} .pv-r{color:var(--red);font-family:var(--mono);}
+
+    /* TOAST */
+    .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--surface);border:1px solid var(--border2);color:var(--text);padding:12px 20px;border-radius:var(--radius);font-size:14px;z-index:9999;transition:transform .3s cubic-bezier(.34,1.56,.64,1);box-shadow:0 8px 32px rgba(0,0,0,.5);max-width:340px;text-align:center;}
+    .toast.show{transform:translateX(-50%) translateY(0);}
+
+    /* ERROR BANNER */
+    .api-error{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#f87171;padding:10px 16px;border-radius:8px;font-size:13px;margin-bottom:16px;display:none;}
+    .api-error.show{display:block;}
+
+    ::-webkit-scrollbar{width:6px;} ::-webkit-scrollbar-track{background:transparent;} ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
+    @media(max-width:600px){.logo span{display:none;}.nav-btn{padding:6px 10px;font-size:13px;}}
+
+    /* LOGIN MODAL */
+    .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);z-index:2000;display:flex;align-items:center;justify-content:center;padding:16px;}
+    .modal-backdrop.hidden{display:none;}
+    .modal{background:var(--surface);border:1px solid var(--border2);border-radius:14px;padding:28px;width:100%;max-width:380px;animation:modalIn .2s ease;}
+    @keyframes modalIn{from{opacity:0;transform:scale(.95);}to{opacity:1;transform:scale(1);}}
+    .modal h3{font-size:18px;font-weight:700;margin-bottom:6px;}
+    .modal p{font-size:13px;color:var(--text-muted);margin-bottom:22px;}
+    .modal .form-group{margin-bottom:14px;}
+    .modal .form-group label{display:block;font-size:12px;color:var(--text-muted);margin-bottom:5px;}
+    .modal input[type=text],.modal input[type=password]{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:var(--font);font-size:14px;padding:10px 12px;border-radius:7px;outline:none;transition:border-color .18s;}
+    .modal input:focus{border-color:var(--accent);}
+    .modal-error{background:var(--red-dim);border:1px solid rgba(239,68,68,.3);color:#f87171;padding:8px 12px;border-radius:6px;font-size:13px;margin-bottom:14px;display:none;}
+    .modal-error.show{display:block;}
+    .modal-btns{display:flex;gap:8px;margin-top:6px;}
+    .modal-login-btn{flex:1;background:var(--accent);color:#000;border:none;font-family:var(--font);font-size:14px;font-weight:700;padding:11px;border-radius:8px;cursor:pointer;transition:all .18s;}
+    .modal-login-btn:hover{background:#fbbf24;}
+    .modal-cancel-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);font-family:var(--font);font-size:14px;padding:11px 16px;border-radius:8px;cursor:pointer;transition:all .18s;}
+    .modal-cancel-btn:hover{border-color:var(--border2);color:var(--text);}
+    .user-badge{display:flex;align-items:center;gap:8px;}
+    .user-name{font-size:13px;color:var(--text-muted);}
+    .login-btn{background:var(--accent-dim);border:1px solid rgba(245,158,11,.3);color:var(--accent);font-family:var(--font);font-size:13px;font-weight:600;padding:5px 14px;border-radius:7px;cursor:pointer;transition:all .18s;}
+    .login-btn:hover{background:var(--accent);color:#000;}
+    .logout-btn{background:none;border:1px solid var(--border);color:var(--text-muted);font-family:var(--font);font-size:12px;padding:5px 10px;border-radius:7px;transition:all .18s;cursor:pointer;}
+    .logout-btn:hover{border-color:var(--red);color:var(--red);}
+    .login-wall{text-align:center;padding:60px 20px;}
+    .login-wall .wall-icon{font-size:48px;margin-bottom:14px;}
+    .login-wall h3{font-size:18px;font-weight:700;margin-bottom:8px;}
+    .login-wall p{font-size:14px;color:var(--text-muted);margin-bottom:20px;line-height:1.6;}
+    .wall-login-btn{background:var(--accent);color:#000;border:none;font-family:var(--font);font-size:14px;font-weight:700;padding:12px 28px;border-radius:9px;cursor:pointer;}
+    .wall-login-btn:hover{background:#fbbf24;}
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">⛽</div>
+    <span>PumpRadar <span style="color:var(--text-muted);font-weight:400;font-size:13px">สระแก้ว</span></span>
+  </div>
+  <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+  <nav>
+    <button class="nav-btn active" data-tab="map"    onclick="switchTab('map')">🗺️ แผนที่</button>
+    <button class="nav-btn"        data-tab="feed"   onclick="switchTab('feed')">📡 ฟีด</button>
+    <button class="nav-btn"        data-tab="report" onclick="switchTab('report')">✍️ รายงาน</button>
+    <button class="nav-btn"        data-tab="dash"   onclick="switchTab('dash')">📊 ข้อมูล</button>
+  </nav>
+  <div class="user-badge" id="user-badge">
+    <button class="login-btn" onclick="showLogin()">🔑 ล็อกอิน</button>
+  </div>
+</header>
+
+<!-- MAP -->
+<main id="main-map" class="active">
+  <div id="map-view">
+    <div id="map"></div>
+    <div class="map-overlay">
+      <div class="map-stats">
+        <div class="map-stat"><div class="map-stat-num green" id="stat-avail">—</div><div class="map-stat-label">มีน้ำมัน</div></div>
+        <div class="map-stat"><div class="map-stat-num red"   id="stat-unavail">—</div><div class="map-stat-label">ไม่มีน้ำมัน</div></div>
+        <div class="map-stat"><div class="map-stat-num yellow" id="stat-queue">—</div><div class="map-stat-label">คิวยาว</div></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- FEED -->
+<main id="main-feed">
+  <div id="feed-view">
+    <div class="feed-header">
+      <div class="feed-title">รายงานล่าสุด</div>
+      <div class="feed-count" id="feed-count">—</div>
+    </div>
+    <div class="api-error" id="feed-error">⚠️ ไม่สามารถเชื่อมต่อ API ได้ — ตรวจสอบว่า server.js กำลังรันอยู่</div>
+    <div class="filter-row">
+      <div class="filter-chip active-filter" onclick="setFilter('',this)">ทั้งหมด</div>
+      <div class="filter-chip" onclick="setFilter('มีน้ำมัน',this)">✅ มีน้ำมัน</div>
+      <div class="filter-chip" onclick="setFilter('ไม่มีน้ำมัน',this)">❌ ไม่มีน้ำมัน</div>
+      <div class="filter-chip" onclick="setFilter('คิวยาว',this)">🟡 คิวยาว</div>
+    </div>
+    <div id="feed-list"></div>
+  </div>
+</main>
+
+<!-- REPORT FORM -->
+<main id="main-report">
+  <div id="report-view">
+    <div class="form-header">
+      <h2>📝 รายงานสถานะปั๊ม</h2>
+      <p>ช่วยแจ้งข้อมูลเพื่อให้ผู้ใช้คนอื่นวางแผนได้</p>
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">01 — ข้อมูลปั๊ม</div>
+      <div class="form-group"><label>ชื่อปั๊ม / สถานี *</label><input type="text" id="f-station" placeholder="เช่น ปตท. สุขุมวิท 71"></div>
+      <div class="form-group"><label>แบรนด์ปั๊ม</label>
+        <select id="f-brand">
+          <option value="ปตท.">⛽ ปตท. (PTT)</option><option value="บางจาก">🟡 บางจาก</option>
+          <option value="เชลล์">🔴 เชลล์ (Shell)</option><option value="เอสโซ่">🔵 เอสโซ่ (Esso)</option>
+          <option value="คาลเท็กซ์">🟢 คาลเท็กซ์ (Caltex)</option><option value="ซัสโก้">🟠 ซัสโก้ (Susco)</option>
+          <option value="อื่นๆ">⚪ อื่นๆ</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>จังหวัด</label>
+        <input type="text" value="สระแก้ว" disabled style="opacity:.6;cursor:not-allowed;">
+        <input type="hidden" id="f-province" value="สระแก้ว">
+      </div>
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">02 — สถานะน้ำมัน *</div>
+      <div class="status-select">
+        <div class="status-option" id="s-available"  onclick="selectStatus('มีน้ำมัน')"><span class="s-icon">✅</span>มีน้ำมัน</div>
+        <div class="status-option" id="s-unavailable" onclick="selectStatus('ไม่มีน้ำมัน')"><span class="s-icon">❌</span>ไม่มีน้ำมัน</div>
+        <div class="status-option" id="s-queue"       onclick="selectStatus('คิวยาว')"><span class="s-icon">🟡</span>คิวยาว</div>
+      </div>
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">03 — ประเภทน้ำมัน</div>
+      <div class="fuel-checkboxes">
+        <label class="fuel-check"><input type="checkbox" value="ดีเซล"><span class="fuel-chip">ดีเซล</span></label>
+        <label class="fuel-check"><input type="checkbox" value="เบนซิน 91"><span class="fuel-chip">เบนซิน 91</span></label>
+        <label class="fuel-check"><input type="checkbox" value="เบนซิน 95"><span class="fuel-chip">เบนซิน 95</span></label>
+        <label class="fuel-check"><input type="checkbox" value="แก๊สโซฮอล์ E20"><span class="fuel-chip">E20</span></label>
+        <label class="fuel-check"><input type="checkbox" value="แก๊สโซฮอล์ E85"><span class="fuel-chip">E85</span></label>
+        <label class="fuel-check"><input type="checkbox" value="ดีเซล B7"><span class="fuel-chip">ดีเซล B7</span></label>
+        <label class="fuel-check"><input type="checkbox" value="LPG"><span class="fuel-chip">LPG</span></label>
+        <label class="fuel-check"><input type="checkbox" value="NGV"><span class="fuel-chip">NGV</span></label>
+      </div>
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">04 — ตำแหน่ง (ถ้ามี)</div>
+      <div class="coords-row">
+        <div class="form-group"><label>Latitude</label><input type="text" id="f-lat" placeholder="13.7563"></div>
+        <div class="form-group"><label>Longitude</label><input type="text" id="f-lng" placeholder="100.5018"></div>
+      </div>
+      <button class="get-location-btn" onclick="getLocation()">📍 ใช้ตำแหน่งปัจจุบัน</button>
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">05 — หมายเหตุ</div>
+      <textarea id="f-comment" placeholder="เช่น คิวยาวประมาณ 30 นาที, มีเฉพาะดีเซล..."></textarea>
+    </div>
+    <button class="submit-btn" id="submit-btn" onclick="submitReport()">📤 ส่งรายงาน</button>
+  </div>
+</main>
+
+<!-- DASHBOARD -->
+<main id="main-dash">
+  <div id="dash-view">
+    <div class="feed-header" style="margin-bottom:20px"><div class="feed-title">สถิติภาพรวม</div></div>
+    <div class="api-error" id="dash-error">⚠️ ไม่สามารถเชื่อมต่อ API ได้</div>
+    <div class="dash-grid">
+      <div class="dash-card"><div class="dash-card-num" id="d-total"  style="color:var(--accent)">—</div><div class="dash-card-label">รายงานทั้งหมด</div></div>
+      <div class="dash-card"><div class="dash-card-num green" id="d-avail">—</div><div class="dash-card-label">มีน้ำมัน</div></div>
+      <div class="dash-card"><div class="dash-card-num red"   id="d-unavail">—</div><div class="dash-card-label">ไม่มีน้ำมัน</div></div>
+      <div class="dash-card"><div class="dash-card-num yellow" id="d-queue">—</div><div class="dash-card-label">คิวยาว</div></div>
+    </div>
+    <div class="province-table">
+      <div class="province-table-head"><div>จังหวัด</div><div>รายงาน</div><div style="color:var(--green)">✅</div><div style="color:var(--red)">❌</div></div>
+      <div id="province-rows"></div>
+    </div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<!-- LOGIN MODAL -->
+<div class="modal-backdrop hidden" id="login-modal">
+  <div class="modal">
+    <h3>🔑 ล็อกอินเพื่อรายงาน</h3>
+    <p>คุณต้องล็อกอินก่อนจึงจะรายงานสถานะปั๊มได้</p>
+    <div class="modal-error" id="login-error"></div>
+    <div class="form-group"><label>ชื่อผู้ใช้</label><input type="text" id="login-user" placeholder="username" autocomplete="username"></div>
+    <div class="form-group"><label>รหัสผ่าน</label><input type="password" id="login-pass" placeholder="password" autocomplete="current-password"></div>
+    <div class="modal-btns">
+      <button class="modal-cancel-btn" onclick="hideLogin()">ยกเลิก</button>
+      <button class="modal-login-btn" onclick="doLogin()">ล็อกอิน</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+const API = 'http://localhost:3000/api';
+const VOTED_KEY = 'pumpradar_voted';
+const TOKEN_KEY = 'pumpradar_token';
+const NAME_KEY  = 'pumpradar_name';
+
+// ── AUTH STATE ────────────────────────────────────────────────────────────────
+let currentToken = localStorage.getItem(TOKEN_KEY) || null;
+let currentName  = localStorage.getItem(NAME_KEY)  || null;
+
+function updateUserBadge() {
+  const badge = document.getElementById('user-badge');
+  if (currentToken && currentName) {
+    badge.innerHTML = `<span class="user-name">👤 ${currentName}</span><button class="logout-btn" onclick="doLogout()">ออกจากระบบ</button>`;
+  } else {
+    badge.innerHTML = `<button class="login-btn" onclick="showLogin()">🔑 ล็อกอิน</button>`;
+  }
+}
+
+function showLogin() { document.getElementById('login-modal').classList.remove('hidden'); document.getElementById('login-user').focus(); }
+function hideLogin() { document.getElementById('login-modal').classList.add('hidden'); document.getElementById('login-error').classList.remove('show'); }
+
+async function doLogin() {
+  const username = document.getElementById('login-user').value.trim();
+  const password = document.getElementById('login-pass').value;
+  const errEl = document.getElementById('login-error');
+  errEl.classList.remove('show');
+  if (!username || !password) { errEl.textContent='กรุณากรอกชื่อผู้ใช้และรหัสผ่าน'; errEl.classList.add('show'); return; }
+  try {
+    const res = await fetch(`${API}/login`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username, password}) });
+    const data = await res.json();
+    if (!res.ok) { errEl.textContent = data.error || 'ล็อกอินไม่สำเร็จ'; errEl.classList.add('show'); return; }
+    currentToken = data.token;
+    currentName  = data.name;
+    localStorage.setItem(TOKEN_KEY, currentToken);
+    localStorage.setItem(NAME_KEY, currentName);
+    hideLogin();
+    updateUserBadge();
+    showToast(`ยินดีต้อนรับ ${currentName} 👋`);
+    // refresh report tab if open
+    if (document.getElementById('main-report').classList.contains('active')) switchTab('report');
+  } catch(e) { errEl.textContent='เกิดข้อผิดพลาด ลองใหม่อีกครั้ง'; errEl.classList.add('show'); }
+}
+
+async function doLogout() {
+  try { await fetch(`${API}/logout`, { method:'POST', headers:{'x-token': currentToken||''} }); } catch(e){}
+  currentToken = null; currentName = null;
+  localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(NAME_KEY);
+  updateUserBadge();
+  showToast('ออกจากระบบแล้ว');
+  if (document.getElementById('main-report').classList.contains('active')) switchTab('report');
+}
+
+// Enter key on login modal
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !document.getElementById('login-modal').classList.contains('hidden')) doLogin();
+});
+
+// ── VOTED TRACKING (localStorage just for upvote dedup) ──────────────────────
+function getVoted() { try { return new Set(JSON.parse(localStorage.getItem(VOTED_KEY)||'[]')); } catch { return new Set(); } }
+function markVoted(id) { const v=getVoted(); v.add(id); localStorage.setItem(VOTED_KEY,JSON.stringify([...v])); }
+
+// ── UTILS ─────────────────────────────────────────────────────────────────────
+function timeAgo(iso) {
+  const diff=(Date.now()-new Date(iso))/1000;
+  if(diff<60)return'เมื่อกี้';
+  if(diff<3600)return`${Math.floor(diff/60)} นาทีที่แล้ว`;
+  if(diff<86400)return`${Math.floor(diff/3600)} ชั่วโมงที่แล้ว`;
+  return`${Math.floor(diff/86400)} วันที่แล้ว`;
+}
+let toastT;
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2800);}
+
+const BRAND_EMOJI={'ปตท.':'⛽','บางจาก':'🟡','เชลล์':'🔴','เอสโซ่':'🔵','คาลเท็กซ์':'🟢','ซัสโก้':'🟠','อื่นๆ':'⚪'};
+const BRAND_BG={'ปตท.':'rgba(34,197,94,.12)','บางจาก':'rgba(234,179,8,.12)','เชลล์':'rgba(239,68,68,.12)','เอสโซ่':'rgba(59,130,246,.12)','คาลเท็กซ์':'rgba(34,197,94,.12)','ซัสโก้':'rgba(249,115,22,.12)','อื่นๆ':'rgba(120,120,120,.12)'};
+const STATUS_COLOR={'มีน้ำมัน':'#22c55e','ไม่มีน้ำมัน':'#ef4444','คิวยาว':'#eab308'};
+const STATUS_ICON={'มีน้ำมัน':'✅','ไม่มีน้ำมัน':'❌','คิวยาว':'🟡'};
+
+// ── TAB NAV ───────────────────────────────────────────────────────────────────
+function switchTab(tab){
+  document.querySelectorAll('main').forEach(m=>m.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('main-'+tab).classList.add('active');
+  document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
+  if(tab==='map')initMap();
+  if(tab==='feed')renderFeed();
+  if(tab==='dash')renderDash();
+  if(tab==='report') renderReportTab();
+}
+
+function renderReportTab() {
+  const view = document.getElementById('report-view');
+  if (!currentToken) {
+    view.innerHTML = `<div class="login-wall">
+      <div class="wall-icon">🔒</div>
+      <h3>ต้องล็อกอินก่อน</h3>
+      <p>กรุณาล็อกอินเพื่อรายงานสถานะน้ำมัน<br>เพื่อป้องกันข้อมูลไม่ถูกต้อง</p>
+      <button class="wall-login-btn" onclick="showLogin()">🔑 ล็อกอิน</button>
+    </div>`;
+  } else {
+    // restore form if needed
+    if (!document.getElementById('f-station')) {
+      location.reload(); // simple fallback
+    }
+  }
+}
+
+// ── MAP ───────────────────────────────────────────────────────────────────────
+let map=null, markers=[];
+function makeMarkerIcon(status){
+  const color=STATUS_COLOR[status]||'#999';
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="28" height="36" viewBox="0 0 28 36"><ellipse cx="14" cy="33" rx="6" ry="3" fill="rgba(0,0,0,0.3)"/><path d="M14 2 C8 2 4 7 4 13 C4 21 14 32 14 32 C14 32 24 21 24 13 C24 7 20 2 14 2Z" fill="${color}" stroke="rgba(0,0,0,0.4)" stroke-width="1.5"/><circle cx="14" cy="13" r="5" fill="white" opacity="0.9"/></svg>`;
+  return L.divIcon({html:svg,className:'',iconSize:[28,36],iconAnchor:[14,36],popupAnchor:[0,-36]});
+}
+async function initMap(){
+  if(!map){
+    map=L.map('map',{center:[13.8200,102.0650],zoom:10});
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'© OpenStreetMap © CARTO',subdomains:'abcd',maxZoom:19}).addTo(map);
+  }
+  try{
+    const [mapData,stats]=await Promise.all([fetch(`${API}/map`).then(r=>r.json()),fetch(`${API}/stats`).then(r=>r.json())]);
+    markers.forEach(m=>m.remove()); markers=[];
+    mapData.filter(r=>r.province==='สระแก้ว').forEach(r=>{
+      const m=L.marker([r.lat,r.lng],{icon:makeMarkerIcon(r.status)}).addTo(map)
+        .bindPopup(`<div class="popup-station">${r.brand} — ${r.station}</div><div style="font-size:12px;margin-bottom:4px">${STATUS_ICON[r.status]} ${r.status}</div><div style="font-size:12px;color:#7a7f8a;margin-bottom:4px">${r.province}</div>${r.comment?`<div style="font-size:12px;color:#aaa;margin-bottom:4px">${r.comment}</div>`:''}<div class="popup-time">${timeAgo(r.created_at)}</div>`);
+      markers.push(m);
+    });
+    document.getElementById('stat-avail').textContent=stats.avail;
+    document.getElementById('stat-unavail').textContent=stats.unavail;
+    document.getElementById('stat-queue').textContent=stats.queue;
+  }catch(e){ console.error('Map API error',e); }
+}
+
+// ── FEED ──────────────────────────────────────────────────────────────────────
+let currentFilter='';
+function setFilter(f,el){
+  currentFilter=f;
+  document.querySelectorAll('.filter-chip').forEach(c=>c.classList.remove('active-filter'));
+  el.classList.add('active-filter');
+  renderFeed();
+}
+function renderSkeletons(){
+  document.getElementById('feed-list').innerHTML=[...Array(3)].map(()=>'<div class="skeleton"></div>').join('');
+}
+async function renderFeed(){
+  renderSkeletons();
+  document.getElementById('feed-error').classList.remove('show');
+  try{
+    const url=`${API}/reports?limit=50&province=${encodeURIComponent('สระแก้ว')}${currentFilter?'&status='+encodeURIComponent(currentFilter):''}`;
+    const data=await fetch(url).then(r=>r.json());
+    const voted=getVoted();
+    document.getElementById('feed-count').textContent=data.total+' รายการ';
+    if(!data.reports.length){
+      document.getElementById('feed-list').innerHTML=`<div class="empty-feed"><div class="empty-icon">📭</div><p>ยังไม่มีรายงาน</p></div>`;
+      return;
+    }
+    document.getElementById('feed-list').innerHTML=data.reports.map(r=>{
+      const sc=r.status==='มีน้ำมัน'?'available':r.status==='ไม่มีน้ำมัน'?'unavailable':'queue';
+      const isVoted=voted.has(r.id);
+      return`<div class="report-card">
+        <div class="card-top">
+          <div class="brand-badge" style="background:${BRAND_BG[r.brand]||BRAND_BG['อื่นๆ']}">${BRAND_EMOJI[r.brand]||'⛽'}</div>
+          <div class="card-info">
+            <div class="card-station">${r.brand} — ${r.station}</div>
+            <div class="card-sub">📍 ${r.province}</div>
+          </div>
+          <div class="status-badge ${sc}">${STATUS_ICON[r.status]} ${r.status}</div>
+        </div>
+        ${r.fuel_types?.length?`<div class="fuel-tags">${r.fuel_types.map(f=>`<span class="fuel-tag">${f}</span>`).join('')}</div>`:''}
+        ${r.comment?`<div class="card-comment">${r.comment}</div>`:''}
+        <div class="card-footer">
+          <div class="card-time">${timeAgo(r.created_at)}</div>
+          <button class="upvote-btn ${isVoted?'voted':''}" onclick="upvote('${r.id}',this)">👍 <span>${r.upvotes}</span></button>
+        </div>
+      </div>`;
+    }).join('');
+  }catch(e){
+    document.getElementById('feed-list').innerHTML='';
+    document.getElementById('feed-error').classList.add('show');
+  }
+}
+async function upvote(id,btn){
+  if(getVoted().has(id)){showToast('คุณโหวตแล้ว');return;}
+  try{
+    const r=await fetch(`${API}/reports/${id}/upvote`,{method:'PATCH'}).then(r=>r.json());
+    markVoted(id);
+    btn.classList.add('voted');
+    btn.querySelector('span').textContent=r.upvotes;
+    showToast('ขอบคุณที่ยืนยันข้อมูล! 👍');
+  }catch(e){showToast('เกิดข้อผิดพลาด');}
+}
+
+// ── REPORT FORM ───────────────────────────────────────────────────────────────
+let selectedStatus='';
+function selectStatus(s){
+  selectedStatus=s;
+  ['s-available','s-unavailable','s-queue'].forEach(id=>document.getElementById(id).className='status-option');
+  const map2={มีน้ำมัน:['s-available','sel-available'],ไม่มีน้ำมัน:['s-unavailable','sel-unavailable'],คิวยาว:['s-queue','sel-queue']};
+  const[id,cls]=map2[s];
+  document.getElementById(id).classList.add(cls);
+}
+function getLocation(){
+  if(!navigator.geolocation){showToast('เบราว์เซอร์ไม่รองรับ GPS');return;}
+  showToast('กำลังระบุตำแหน่ง...');
+  navigator.geolocation.getCurrentPosition(pos=>{
+    document.getElementById('f-lat').value=pos.coords.latitude.toFixed(6);
+    document.getElementById('f-lng').value=pos.coords.longitude.toFixed(6);
+    showToast('📍 ได้ตำแหน่งแล้ว!');
+  },()=>showToast('ไม่สามารถระบุตำแหน่งได้'));
+}
+async function submitReport(){
+  const station=document.getElementById('f-station').value.trim();
+  const brand=document.getElementById('f-brand').value;
+  const province=document.getElementById('f-province').value;
+  const comment=document.getElementById('f-comment').value.trim();
+  const lat=parseFloat(document.getElementById('f-lat').value)||null;
+  const lng=parseFloat(document.getElementById('f-lng').value)||null;
+  const fuel_types=[...document.querySelectorAll('.fuel-check input:checked')].map(cb=>cb.value);
+  if(!station){showToast('⚠️ กรุณากรอกชื่อปั๊ม');return;}
+  if(!province){showToast('⚠️ กรุณาเลือกจังหวัด');return;}
+  if(!selectedStatus){showToast('⚠️ กรุณาเลือกสถานะน้ำมัน');return;}
+  const btn=document.getElementById('submit-btn');
+  btn.disabled=true; btn.textContent='⏳ กำลังส่ง...';
+  try{
+    const res=await fetch(`${API}/reports`,{method:'POST',headers:{'Content-Type':'application/json','x-token':currentToken||''},body:JSON.stringify({station,brand,status:selectedStatus,fuel_types,province,lat,lng,comment})});
+    if(!res.ok)throw new Error();
+    resetForm(); showToast('✅ ส่งรายงานสำเร็จ! ขอบคุณมาก 🙏');
+    setTimeout(()=>switchTab('feed'),1200);
+  }catch(e){showToast('❌ ส่งรายงานไม่สำเร็จ — ตรวจสอบการเชื่อมต่อ');}
+  finally{btn.disabled=false;btn.textContent='📤 ส่งรายงาน';}
+}
+function resetForm(){
+  ['f-station','f-comment','f-lat','f-lng'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('f-province').value='';
+  document.querySelectorAll('.fuel-check input').forEach(cb=>cb.checked=false);
+  selectedStatus='';
+  ['s-available','s-unavailable','s-queue'].forEach(id=>document.getElementById(id).className='status-option');
+}
+
+// ── DASHBOARD ─────────────────────────────────────────────────────────────────
+async function renderDash(){
+  document.getElementById('dash-error').classList.remove('show');
+  try{
+    const stats=await fetch(`${API}/stats`).then(r=>r.json());
+    document.getElementById('d-total').textContent=stats.total;
+    document.getElementById('d-avail').textContent=stats.avail;
+    document.getElementById('d-unavail').textContent=stats.unavail;
+    document.getElementById('d-queue').textContent=stats.queue;
+    // Show only Sa Kaeo in province table
+    const sakaeo = stats.byProvince.filter(p=>p.province==='สระแก้ว');
+    document.getElementById('province-rows').innerHTML=sakaeo.map(p=>`
+      <div class="province-row">
+        <div class="pv-name">${p.province}</div>
+        <div class="pv-num">${p.total}</div>
+        <div class="pv-g">${p.avail}</div>
+        <div class="pv-r">${p.unavail}</div>
+      </div>`).join('')||'<div class="province-row"><div style="color:var(--text-dim)">ยังไม่มีข้อมูล</div></div>';
+  }catch(e){document.getElementById('dash-error').classList.add('show');}
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+updateUserBadge();
+initMap();
+setInterval(()=>{
+  if(document.getElementById('main-map').classList.contains('active'))initMap();
+  if(document.getElementById('main-feed').classList.contains('active'))renderFeed();
+},30000);
+</script>
+</body>
+</html>
